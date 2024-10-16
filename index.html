@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>口パクジェネレータ</title>
+    <style>
+      body div {
+        background-color: #00ff00; 
+      }
+    </style>
+</head>
+<body>
+    <h1>口パクジェネレータ</h1>
+
+  <label for="imageA"><b>無言時</b>の画像を選択してください:</label>
+    <input type="file" id="imageA" accept="image/*"><br><br>
+
+  <label for="imageB"><b>発声時</b>の画像を選択してください:</label>
+    <input type="file" id="imageB" accept="image/*"><br><br>
+
+
+  <label for="audioFile"><b>音声ファイル</b>を選択してください:</label>
+    <input type="file" id="audioFile" accept="audio/*"><br><br>
+  
+    <label for="volumeThreshold">音量閾値:</label>
+    <input type="range" id="volumeThreshold" min="0" max="100" value="33" step="1">
+    <span id="thresholdDisplay">33</span><br><br>
+    
+    <div>
+        <img id="displayImage" src="" alt="画像を選択"><br><br>
+    </div>
+
+    <audio id="audio" controls></audio>
+
+    <script>
+        const audioElement = document.getElementById('audio');
+        const displayImage = document.getElementById('displayImage');
+        const thresholdSlider = document.getElementById('volumeThreshold');
+        const thresholdDisplay = document.getElementById('thresholdDisplay');
+        let imageA = '';
+        let imageB = '';
+        let vol = 33; // 初期値を33に設定
+
+        // 閾値スライダの値を表示し、変数に保存
+        thresholdSlider.addEventListener('input', function() {
+            vol = thresholdSlider.value;
+            thresholdDisplay.textContent = vol;
+        });
+
+        // 画像Aを選択した時の処理
+        document.getElementById('imageA').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imageA = e.target.result;
+                    displayImage.src = imageA;  // デフォルト画像を画像Aに
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // 画像Bを選択した時の処理
+        document.getElementById('imageB').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imageB = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // 音声ファイルを選択した時の処理
+        document.getElementById('audioFile').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const url = URL.createObjectURL(file);
+                audioElement.src = url;
+                audioElement.load();
+
+                // 音声を解析して音量を取得
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const analyser = audioContext.createAnalyser();
+                const source = audioContext.createMediaElementSource(audioElement);
+                source.connect(analyser);
+                analyser.connect(audioContext.destination);
+                analyser.fftSize = 256;
+
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+
+                function detectVolume() {
+                    analyser.getByteFrequencyData(dataArray);
+                    let sum = 0;
+                    for (let i = 0; i < bufferLength; i++) {
+                        sum += dataArray[i];
+                    }
+                    const volume = sum / bufferLength;
+
+                    if (volume > vol) {
+                        displayImage.src = imageB;
+                    } else {
+                        displayImage.src = imageA;
+                    }
+                    
+                    requestAnimationFrame(detectVolume);
+                }
+
+                audioElement.play();
+                detectVolume();
+            }
+        });
+    </script>
+</body>
+</html>
